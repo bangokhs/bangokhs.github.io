@@ -1,68 +1,264 @@
-<script>
-    // JavaScript: 슬롯머신 로직 (버그 수정 및 안정화 버전)
-    
-    // --- 1. 설정 및 변수 ---
-    
-    // 심볼과 확률 정의
-    const probabilities = [
-        { symbol: '🍒', weight: 40 }, 
-        { symbol: '🍋', weight: 30 },
-        { symbol: '🔔', weight: 20 },
-        { symbol: '⭐', weight: 7 }, 
-        { symbol: '7️⃣', weight: 3 }  
-    ];
-    
-    // 잭팟 배율
-    const payouts = {
-        '🍒': 10,
-        '🍋': 20,
-        '🔔': 50,
-        '⭐': 100,
-        '7️⃣': 500
-    };
-    
-    const partialMatchPayout = 3; 
-    const INITIAL_BALANCE = 100; 
-    
-    let coinBalance; // loadBalance에서 초기화됨
-    const betAmount = 10;
-    const REEL_STOP_INTERVAL = 1000; 
-    const SPIN_DURATION = 3000; 
-    const STORAGE_KEY = 'slotMachineCoinBalance'; 
-
-    // DOM 요소
-    const reelElements = [
-        document.getElementById('reel1'),
-        document.getElementById('reel2'),
-        document.getElementById('reel3')
-    ];
-    const spinButton = document.getElementById('spinButton');
-    const resultDisplay = document.getElementById('result');
-    const balanceDisplay = document.getElementById('coinBalanceDisplay');
-
-    // --- 2. 로컬 저장소 및 잔액 관리 ---
-
-    function saveBalance() {
-        localStorage.setItem(STORAGE_KEY, coinBalance.toString()); // 문자열로 저장
-    }
-
-    function loadBalance() {
-        const savedBalance = localStorage.getItem(STORAGE_KEY);
-        // 저장된 값이 유효하지 않거나 0보다 작으면 초기값으로 설정
-        if (savedBalance === null || isNaN(parseInt(savedBalance)) || parseInt(savedBalance) < 0) {
-            coinBalance = INITIAL_BALANCE;
-        } else {
-            coinBalance = parseInt(savedBalance);
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>확률 기반 슬롯머신</title>
+    <style>
+        /* CSS: 스타일 정의 */
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0ff00; /* 배경색 변경 (흰 화면 오류 방지 시도) */
         }
-        updateBalanceDisplay();
-    }
+        .balance-box {
+            margin-bottom: 15px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+            padding: 10px 20px;
+            border: 2px solid #555;
+            border-radius: 5px;
+            background-color: #ffe082;
+        }
+        .slot-container {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        .reel {
+            font-size: 60px; 
+            width: 100px;
+            height: 100px;
+            line-height: 100px;
+            text-align: center;
+            border: 5px solid #000;
+            border-radius: 8px;
+            background-color: #fff;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        button {
+            padding: 12px 40px;
+            font-size: 24px;
+            cursor: pointer;
+            background-color: #e53935;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            transition: background-color 0.3s;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+        button:hover:not(:disabled) {
+            background-color: #c62828;
+        }
+        button:disabled {
+            background-color: #ffcdd2;
+            cursor: not-allowed;
+        }
+        #result {
+            margin-top: 25px;
+            font-size: 28px;
+            font-weight: 900;
+            min-height: 30px;
+        }
+    </style>
+</head>
+<body>
+    <h1>확률 슬롯머신</h1>
+    
+    <div class="balance-box">
+        잔액: <span id="coinBalanceDisplay">100</span> 코인 (배팅: 10 코인)
+    </div>
 
-    // 잔액 표시 및 버튼 상태 업데이트 (버그 방지 로직 추가)
-    function updateBalanceDisplay() {
-        balanceDisplay.textContent = coinBalance;
-        saveBalance(); 
+    <div class="slot-container">
+        <div class="reel" id="reel1">❓</div>
+        <div class="reel" id="reel2">❓</div>
+        <div class="reel" id="reel3">❓</div>
+    </div>
 
-        // 잔액이 배팅 금액보다 적으면 버튼 비활성화 (버그 방지)
-        if (coinBalance < betAmount) {
+    <button id="spinButton">SPIN</button>
+
+    <div id="result">SPIN 버튼을 누르세요!</div>
+
+    <script>
+        // JavaScript: 슬롯머신 로직 (버그 수정 및 안정화 버전)
+        
+        // --- 1. 설정 및 변수 ---
+        const probabilities = [
+            { symbol: '🍒', weight: 40 }, 
+            { symbol: '🍋', weight: 30 },
+            { symbol: '🔔', weight: 20 },
+            { symbol: '⭐', weight: 7 }, 
+            { symbol: '7️⃣', weight: 3 }  
+        ];
+        
+        const payouts = {
+            '🍒': 10, '🍋': 20, '🔔': 50, '⭐': 100, '7️⃣': 500
+        };
+        
+        const partialMatchPayout = 3; 
+        const INITIAL_BALANCE = 100; 
+        
+        let coinBalance; 
+        const betAmount = 10;
+        const REEL_STOP_INTERVAL = 1000; 
+        const SPIN_DURATION = 3000; 
+        const STORAGE_KEY = 'slotMachineCoinBalance'; 
+
+        const reelElements = [
+            document.getElementById('reel1'),
+            document.getElementById('reel2'),
+            document.getElementById('reel3')
+        ];
+        const spinButton = document.getElementById('spinButton');
+        const resultDisplay = document.getElementById('result');
+        const balanceDisplay = document.getElementById('coinBalanceDisplay');
+
+        // --- 2. 로컬 저장소 및 잔액 관리 ---
+
+        function saveBalance() {
+            localStorage.setItem(STORAGE_KEY, coinBalance.toString());
+        }
+
+        function loadBalance() {
+            const savedBalance = localStorage.getItem(STORAGE_KEY);
+            if (savedBalance === null || isNaN(parseInt(savedBalance)) || parseInt(savedBalance) < 0) {
+                coinBalance = INITIAL_BALANCE;
+            } else {
+                coinBalance = parseInt(savedBalance);
+            }
+            updateBalanceDisplay();
+        }
+
+        function updateBalanceDisplay() {
+            balanceDisplay.textContent = coinBalance;
+            saveBalance(); 
+
+            if (coinBalance < betAmount) {
+                spinButton.disabled = true;
+                resultDisplay.textContent = "코인 부족! 다시 시작하려면 새로고침하세요.";
+                resultDisplay.style.color = 'red';
+            } else {
+                spinButton.disabled = false;
+            }
+        }
+
+        // --- 3. 확률 기반 심볼 선택 로직 ---
+        
+        function getSymbolByProbability() {
+            const totalWeight = probabilities.reduce((sum, item) => sum + item.weight, 0);
+            let random = Math.random() * totalWeight;
+
+            for (const item of probabilities) {
+                if (random < item.weight) {
+                    return item.symbol;
+                }
+                random -= item.weight;
+            }
+            return probabilities[probabilities.length - 1].symbol; 
+        }
+        
+        // --- 4. 릴 회전 모션 로직 ---
+        
+        function startSpinMotion(reelElement, spinDuration) {
+            const allSymbols = probabilities.map(p => p.symbol);
+            let startTime = null;
+
+            function animate(timestamp) {
+                if (!startTime) startTime = timestamp;
+                const elapsed = timestamp - startTime;
+                
+                if (elapsed < spinDuration) {
+                    const randomIndex = Math.floor(Math.random() * allSymbols.length);
+                    reelElement.textContent = allSymbols[randomIndex];
+                    requestAnimationFrame(animate);
+                }
+            }
+            requestAnimationFrame(animate);
+        }
+
+        // --- 5. 게임 로직 ---
+
+        function spinReelAndGetResult(reelElement, finalSymbol, spinDuration) {
+            return new Promise(resolve => {
+                startSpinMotion(reelElement, spinDuration);
+                
+                setTimeout(() => {
+                    reelElement.textContent = finalSymbol;
+                    resolve(finalSymbol);
+                }, spinDuration);
+            });
+        }
+
+        async function spinSlots() {
+            if (spinButton.disabled) return;
+
+            coinBalance -= betAmount;
+            updateBalanceDisplay();
             spinButton.disabled = true;
-            resultDisplay.textContent = "코인 부족! 다시 시작
+            resultDisplay.textContent = "릴이 돌아갑니다... 행운을 빌어요!";
+            resultDisplay.style.color = '#333';
+            
+            const finalSymbols = reelElements.map(() => getSymbolByProbability()); 
+            const spinPromises = [];
+            
+            for (let i = 0; i < reelElements.length; i++) {
+                const duration = SPIN_DURATION + (i * REEL_STOP_INTERVAL);
+                
+                spinPromises.push(
+                    spinReelAndGetResult(reelElements[i], finalSymbols[i], duration)
+                );
+            }
+            
+            const results = await Promise.all(spinPromises);
+
+            checkResult(results);
+            updateBalanceDisplay();
+        }
+
+        function checkResult(results) {
+            if (results.length !== 3) {
+                resultDisplay.textContent = "치명적인 오류 발생: 결과 개수 불일치.";
+                resultDisplay.style.color = 'red';
+                return;
+            }
+
+            const [r1, r2, r3] = results;
+            let message = "";
+            let winAmount = 0;
+
+            if (r1 === r2 && r2 === r3) {
+                const multiplier = payouts[r1];
+                winAmount = betAmount * multiplier;
+                coinBalance += winAmount;
+                
+                message = `🎉 💥💥 JACKPOT! 💥💥 ${r1} 3개 일치! ${multiplier}배 획득! (+${winAmount})`;
+                resultDisplay.style.color = '#ff9800'; 
+            } else if (r1 === r2 || r2 === r3 || r1 === r3) {
+                winAmount = betAmount * partialMatchPayout;
+                coinBalance += winAmount;
+
+                message = `🥳 두 개 일치! 보너스 ${partialMatchPayout}배 획득! (+${winAmount})`;
+                resultDisplay.style.color = '#4CAF50'; 
+            } else {
+                message = `😭 아쉽네요. 다시 도전! (-${betAmount})`;
+                resultDisplay.style.color = '#d32f2f'; 
+            }
+            
+            resultDisplay.textContent = message;
+        }
+
+        // --- 6. 초기 실행 ---
+        loadBalance(); 
+        spinButton.addEventListener('click', spinSlots);
+        
+    </script>
+    </body>
+</html>
