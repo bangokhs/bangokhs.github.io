@@ -1,5 +1,5 @@
 <script>
-    // JavaScript: 슬롯머신 로직 (확률 및 코인 모델 적용)
+    // JavaScript: 슬롯머신 로직 (localStorage 적용)
     
     // --- 1. 설정 및 변수 ---
     
@@ -21,14 +21,15 @@
         '7️⃣': 500
     };
     
-    const partialMatchPayout = 3; // 두 개 일치 보너스 (3배)
+    const partialMatchPayout = 3; 
 
     // 게임 변수
-    let coinBalance = 100;
+    const INITIAL_BALANCE = 100; // 초기 잔액
+    let coinBalance = INITIAL_BALANCE; // 시작 시 초기 잔액으로 설정
     const betAmount = 10;
-    // 릴 멈춤 간격을 1000ms (1초)로 정의합니다.
     const REEL_STOP_INTERVAL = 1000; 
-    const SPIN_DURATION = 3000; // 각 릴의 총 회전 시간 (3초로 늘려 시차를 명확히 함)
+    const SPIN_DURATION = 3000; 
+    const STORAGE_KEY = 'slotMachineCoinBalance'; // localStorage에 저장될 키
 
     // DOM 요소
     const reelElements = [
@@ -40,136 +41,13 @@
     const resultDisplay = document.getElementById('result');
     const balanceDisplay = document.getElementById('coinBalanceDisplay');
 
-    // 잔액 표시 업데이트 함수
-    function updateBalanceDisplay() {
-        balanceDisplay.textContent = coinBalance;
-    }
+    // --- 2. 로컬 저장소 로직 (새로 추가/수정) ---
 
-    // --- 2. 확률 기반 심볼 선택 로직 ---
-    
-    function getSymbolByProbability() {
-        const totalWeight = probabilities.reduce((sum, item) => sum + item.weight, 0);
-        let random = Math.random() * totalWeight;
-
-        for (const item of probabilities) {
-            if (random < item.weight) {
-                return item.symbol;
-            }
-            random -= item.weight;
-        }
-    }
-    
-    // --- 3. 릴 회전 모션 로직 ---
-    
-    function startSpinMotion(reelElement, spinDuration) {
-        const allSymbols = probabilities.map(p => p.symbol);
-        let startTime = null;
-
-        function animate(timestamp) {
-            if (!startTime) startTime = timestamp;
-            const elapsed = timestamp - startTime;
-            
-            if (elapsed < spinDuration) {
-                const randomIndex = Math.floor(Math.random() * allSymbols.length);
-                reelElement.textContent = allSymbols[randomIndex];
-                requestAnimationFrame(animate);
-            }
-        }
-        requestAnimationFrame(animate);
-    }
-
-    // --- 4. 게임 로직 (수정된 부분) ---
-
-    // 릴을 돌리고 최종 심볼을 확정하는 함수
-    function spinReelAndGetResult(reelElement, finalSymbol, spinDuration) {
-        return new Promise(resolve => {
-            // 회전 모션 시작 (바로 시작)
-            startSpinMotion(reelElement, spinDuration);
-            
-            // 지정된 회전 시간 후 멈춤
-            setTimeout(() => {
-                reelElement.textContent = finalSymbol; // 최종 심볼 표시
-                resolve(finalSymbol);
-            }, spinDuration);
-        });
-    }
-
-    // 전체 슬롯머신을 작동시키는 함수
-    async function spinSlots() {
-        if (coinBalance < betAmount) {
-            resultDisplay.textContent = "코인이 부족합니다! (초기화하려면 새로고침)";
-            return;
-        }
-
-        coinBalance -= betAmount;
-        updateBalanceDisplay();
-        spinButton.disabled = true;
-        resultDisplay.textContent = "릴이 돌아갑니다... 행운을 빌어요!";
-        resultDisplay.style.color = '#333';
-        
-        const finalSymbols = reelElements.map(() => getSymbolByProbability()); // 세 릴의 최종 결과를 미리 결정
-        const results = [];
-        
-        // 릴 1, 2, 3이 1초 간격으로 멈추도록 설정
-        for (let i = 0; i < reelElements.length; i++) {
-            // 각 릴의 총 회전 시간 = 기본 회전 시간 + (릴 번호 * 간격)
-            const duration = SPIN_DURATION + (i * REEL_STOP_INTERVAL);
-            
-            // 릴 회전 시작 (await 없이 비동기적으로 시작)
-            const spinPromise = spinReelAndGetResult(reelElements[i], finalSymbols[i], duration)
-                .then(symbol => {
-                    results.push(symbol);
-                });
-                
-            // 모든 릴이 돌기 시작한 후, 마지막 릴의 멈춤을 기다림
-            if (i === reelElements.length - 1) {
-                await spinPromise; // 마지막 릴이 멈출 때까지 기다림
-            }
-        }
-        
-        // 결과 확인
-        checkResult(results);
-        
-        spinButton.disabled = false;
-    }
-
-    // 승리 조건을 확인하고 코인을 지급하는 함수
-    function checkResult(results) {
-        // 결과 배열이 3개가 아닐 경우를 대비해 검사
-        if (results.length !== 3) {
-            resultDisplay.textContent = "오류: 릴 결과가 불완전합니다.";
-            resultDisplay.style.color = 'red';
-            return;
-        }
-
-        const [r1, r2, r3] = results;
-        let message = "";
-        let winAmount = 0;
-
-        if (r1 === r2 && r2 === r3) {
-            const multiplier = payouts[r1];
-            winAmount = betAmount * multiplier;
-            coinBalance += winAmount;
-            
-            message = `🎉 💥💥 JACKPOT! 💥💥 ${r1} 3개 일치! ${multiplier}배 획득! (+${winAmount})`;
-            resultDisplay.style.color = '#ff9800'; 
-        } else if (r1 === r2 || r2 === r3 || r1 === r3) {
-            winAmount = betAmount * partialMatchPayout;
-            coinBalance += winAmount;
-
-            message = `🥳 두 개 일치! 보너스 ${partialMatchPayout}배 획득! (+${winAmount})`;
-            resultDisplay.style.color = '#4CAF50'; 
+    // 잔액을 localStorage에서 불러오고 없으면 초기값으로 설정
+    function loadBalance() {
+        const savedBalance = localStorage.getItem(STORAGE_KEY);
+        if (savedBalance !== null) {
+            // 저장된 값이 있으면 불러와서 숫자로 변환
+            coinBalance = parseInt(savedBalance);
         } else {
-            message = `😭 아쉽네요. 다시 도전! (-${betAmount})`;
-            resultDisplay.style.color = '#d32f2f'; 
-        }
-        
-        resultDisplay.textContent = message;
-        updateBalanceDisplay();
-    }
-
-    // 초기화
-    updateBalanceDisplay();
-    spinButton.addEventListener('click', spinSlots);
-    
-</script>
+            //
