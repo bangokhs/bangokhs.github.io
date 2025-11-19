@@ -355,7 +355,7 @@
             updateBalanceDisplay();
         }
 
-        function checkResult(results) {
+function checkResult(results) {
             if (results.length !== 3) {
                 resultDisplay.textContent = "치명적인 오류 발생: 결과 개수 불일치.";
                 resultDisplay.style.color = 'red';
@@ -368,21 +368,44 @@
 
             const symbolData = probabilities.find(p => p.symbol === r1); 
             const multiplier = symbolData ? symbolData.payout : 0;
+            
+            // 릴 심볼이 나오는 횟수를 계산합니다.
+            const symbolCounts = {};
+            results.forEach(symbol => {
+                symbolCounts[symbol] = (symbolCounts[symbol] || 0) + 1;
+            });
 
+            // 잭팟 (3개 일치)
             if (r1 === r2 && r2 === r3) {
-                winAmount = betAmount * multiplier;
-                coinBalance += winAmount;
+                // ... (3개 일치 로직은 그대로 유지)
+            
+            // 2개 일치 (보너스 및 코인 반환 로직)
+            } else if (Object.values(symbolCounts).includes(2)) { // 2개가 일치한 경우가 있다면
                 
-                message = `🎉 💥💥 JACKPOT! 💥💥 ${r1} 3개 일치! ${multiplier}배 획득! (+${winAmount})`;
-                resultDisplay.style.color = '#ff9800'; 
-            } else if (r1 === r2 || r2 === r3 || r1 === r3) {
-                winAmount = betAmount * partialMatchPayout;
-                coinBalance += winAmount;
+                // 2개 일치한 심볼을 찾습니다.
+                const matchedSymbol = Object.keys(symbolCounts).find(key => symbolCounts[key] === 2);
+                
+                if (matchedSymbol === '🍒' || matchedSymbol === '🍋') {
+                    // 🍒 또는 🍋 2개 일치: 배팅 금액 10 코인만 돌려줍니다.
+                    winAmount = betAmount; // winAmount는 10
+                    coinBalance += winAmount; // 현재 잔액에 10 코인을 더합니다.
+                    
+                    // 총 배팅 금액(10)을 돌려받았으므로, 결과적으로 0 코인 손익입니다.
+                    message = `🥳 ${matchedSymbol} 2개 일치! 배팅 금액 (${betAmount} 코인) 반환!`;
+                    resultDisplay.style.color = '#4CAF50'; 
+                
+                } else {
+                    // 나머지 심볼 (🔔, ⭐, 7️⃣) 2개 일치: 기존 보너스 배율 적용
+                    winAmount = betAmount * partialMatchPayout;
+                    coinBalance += winAmount;
 
-                message = `두 개 일치! ${partialMatchPayout}배 획득! (+${winAmount})`;
-                resultDisplay.style.color = '#4CAF50'; 
+                    message = `🥳 ${matchedSymbol} 2개 일치! 보너스 ${partialMatchPayout}배 획득! (+${winAmount})`;
+                    resultDisplay.style.color = '#4CAF50'; 
+                }
+
             } else {
-                message = `꽝💥! (-${betAmount})`;
+                // 일치 없음
+                message = `😭 아쉽네요. 다시 도전! (-${betAmount})`;
                 resultDisplay.style.color = '#d32f2f'; 
             }
             
