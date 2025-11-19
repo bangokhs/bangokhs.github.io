@@ -171,7 +171,7 @@
     </div>
     
     <div class="game-frame"> 
-        <h1>확률 슬롯머신</h1>
+        <h1>슬롯머신</h1>
         
         <div class="balance-box">
             잔액: <span id="coinBalanceDisplay">100</span> 코인 (배팅: 10 코인)
@@ -379,10 +379,10 @@
                 winAmount = betAmount * partialMatchPayout;
                 coinBalance += winAmount;
 
-                message = `🥳 두 개 일치! 보너스 ${partialMatchPayout}배 획득! (+${winAmount})`;
+                message = `두 개 일치! ${partialMatchPayout}배 획득! (+${winAmount})`;
                 resultDisplay.style.color = '#4CAF50'; 
             } else {
-                message = `😭 아쉽네요. 다시 도전! (-${betAmount})`;
+                message = `꽝💥! (-${betAmount})`;
                 resultDisplay.style.color = '#d32f2f'; 
             }
             
