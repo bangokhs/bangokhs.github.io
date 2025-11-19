@@ -50,4 +50,141 @@
             // 저장된 값이 있으면 불러와서 숫자로 변환
             coinBalance = parseInt(savedBalance);
         } else {
-            //
+            // 저장된 값이 없으면 초기값으로 설정하고 저장
+            coinBalance = INITIAL_BALANCE;
+            saveBalance(); 
+        }
+    }
+
+    // 잔액을 localStorage에 저장
+    function saveBalance() {
+        localStorage.setItem(STORAGE_KEY, coinBalance);
+    }
+
+    // 잔액 표시 업데이트 및 저장 함수
+    function updateBalanceDisplay() {
+        balanceDisplay.textContent = coinBalance;
+        saveBalance(); // 잔액이 변경될 때마다 저장
+    }
+
+    // --- 3. 확률 기반 심볼 선택 로직 ---
+    
+    function getSymbolByProbability() {
+        const totalWeight = probabilities.reduce((sum, item) => sum + item.weight, 0);
+        let random = Math.random() * totalWeight;
+
+        for (const item of probabilities) {
+            if (random < item.weight) {
+                return item.symbol;
+            }
+            random -= item.weight;
+        }
+    }
+    
+    // --- 4. 릴 회전 모션 로직 ---
+    
+    function startSpinMotion(reelElement, spinDuration) {
+        const allSymbols = probabilities.map(p => p.symbol);
+        let startTime = null;
+
+        function animate(timestamp) {
+            if (!startTime) startTime = timestamp;
+            const elapsed = timestamp - startTime;
+            
+            if (elapsed < spinDuration) {
+                const randomIndex = Math.floor(Math.random() * allSymbols.length);
+                reelElement.textContent = allSymbols[randomIndex];
+                requestAnimationFrame(animate);
+            }
+        }
+        requestAnimationFrame(animate);
+    }
+
+    // --- 5. 게임 로직 ---
+
+    function spinReelAndGetResult(reelElement, finalSymbol, spinDuration) {
+        return new Promise(resolve => {
+            startSpinMotion(reelElement, spinDuration);
+            
+            setTimeout(() => {
+                reelElement.textContent = finalSymbol;
+                resolve(finalSymbol);
+            }, spinDuration);
+        });
+    }
+
+    async function spinSlots() {
+        if (coinBalance < betAmount) {
+            resultDisplay.textContent = "코인이 부족합니다! (초기화하려면 새로고침)";
+            return;
+        }
+
+        coinBalance -= betAmount;
+        updateBalanceDisplay(); // 잔액 차감 후 즉시 저장
+        spinButton.disabled = true;
+        resultDisplay.textContent = "릴이 돌아갑니다... 행운을 빌어요!";
+        resultDisplay.style.color = '#333';
+        
+        const finalSymbols = reelElements.map(() => getSymbolByProbability()); 
+        const results = [];
+        
+        for (let i = 0; i < reelElements.length; i++) {
+            const duration = SPIN_DURATION + (i * REEL_STOP_INTERVAL);
+            
+            const spinPromise = spinReelAndGetResult(reelElements[i], finalSymbols[i], duration)
+                .then(symbol => {
+                    results.push(symbol);
+                });
+                
+            if (i === reelElements.length - 1) {
+                await spinPromise;
+            }
+        }
+        
+        checkResult(results);
+        
+        spinButton.disabled = false;
+    }
+
+    // 승리 조건을 확인하고 코인을 지급하는 함수
+    function checkResult(results) {
+        if (results.length !== 3) {
+            resultDisplay.textContent = "오류: 릴 결과가 불완전합니다.";
+            resultDisplay.style.color = 'red';
+            return;
+        }
+
+        const [r1, r2, r3] = results;
+        let message = "";
+        let winAmount = 0;
+
+        if (r1 === r2 && r2 === r3) {
+            const multiplier = payouts[r1];
+            winAmount = betAmount * multiplier;
+            coinBalance += winAmount;
+            
+            message = `🎉 💥💥 JACKPOT! 💥💥 ${r1} 3개 일치! ${multiplier}배 획득! (+${winAmount})`;
+            resultDisplay.style.color = '#ff9800'; 
+        } else if (r1 === r2 || r2 === r3 || r1 === r3) {
+            winAmount = betAmount * partialMatchPayout;
+            coinBalance += winAmount;
+
+            message = `🥳 두 개 일치! 보너스 ${partialMatchPayout}배 획득! (+${winAmount})`;
+            resultDisplay.style.color = '#4CAF50'; 
+        } else {
+            message = `😭 아쉽네요. 다시 도전! (-${betAmount})`;
+            resultDisplay.style.color = '#d32f2f'; 
+        }
+        
+        resultDisplay.textContent = message;
+        updateBalanceDisplay(); // 승리/실패 후 잔액 증가/감소 및 저장
+    }
+
+    // --- 6. 초기 실행 ---
+    
+    // 페이지 로드 시 잔액을 불러옵니다.
+    loadBalance(); 
+    updateBalanceDisplay();
+    spinButton.addEventListener('click', spinSlots);
+    
+</script>
