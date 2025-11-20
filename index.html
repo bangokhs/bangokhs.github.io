@@ -165,7 +165,7 @@
                     <tr><td>심볼</td><td>확률(%)</td><td>배율(X)</td></tr>
                 </thead>
                 <tbody id="payoutTableBody">
-                    </tbody>
+                </tbody>
             </table>
         </div>
     </div>
@@ -194,7 +194,7 @@
         // --- 1. 설정 및 변수 ---
         const probabilities = [
             { symbol: '🍒', weight: 35, payout: 2 }, 
-            { symbol: '🌶', weight: 25, payout: 2 }
+            { symbol: '🌶', weight: 25, payout: 2 }, // ⚠️ 원본 코드의 문법 오류 수정: 쉼표 추가
             { symbol: '🍋', weight: 20, payout: 5 },
             { symbol: '🔔', weight: 10, payout: 20 },
             { symbol: '⭐', weight: 7, payout: 100 }, 
@@ -263,15 +263,16 @@
             probabilities.forEach(item => {
                 const row = payoutTableBody.insertRow();
                 row.insertCell().textContent = item.symbol;
-                row.insertCell().textContent = `${item.weight}%`;
+                row.insertCell().textContent = `${(item.weight / 100 * 3).toFixed(2)}%`; // 3번의 기회이므로 3으로 나누어주는 것이 일반적이나, 여기서는 심볼 1개 확률 그대로 표시
                 row.insertCell().textContent = `${item.payout}X`;
             });
             // 두 개 일치 보너스 행 추가
             const bonusRow = payoutTableBody.insertRow();
             bonusRow.insertCell().textContent = '2개 일치';
             bonusRow.insertCell().textContent = '-';
-            bonusRow.insertCell().textContent = `${partialMatchPayout}X`;
+            bonusRow.insertCell().textContent = `🍒/🌶/🍋: ${betAmount} 반환, 나머지: ${partialMatchPayout}X`;
             bonusRow.style.fontWeight = 'bold';
+            bonusRow.cells[2].style.textAlign = 'left'; // 텍스트가 길어서 왼쪽 정렬
         }
 
         // 코인 획득 기능
@@ -353,32 +354,34 @@
             const results = await Promise.all(spinPromises);
 
             checkResult(results);
+            // 릴 회전이 끝난 후 버튼 활성화
+            spinButton.disabled = false;
             updateBalanceDisplay();
         }
 
-function checkResult(results) {
+        function checkResult(results) {
             if (results.length !== 3) {
                 resultDisplay.textContent = "치명적인 오류 발생: 결과 개수 불일치.";
                 resultDisplay.style.color = 'red';
                 return;
             }
 
-           const [r1, r2, r3] = results;
+            const [r1, r2, r3] = results;
             let message = "";
             let winAmount = 0;
 
-            const symbolData = probabilities.find(p => p.symbol === r1); 
-            const multiplier = symbolData ? symbolData.payout : 0;
-            
             // 릴 심볼이 나오는 횟수를 계산합니다.
             const symbolCounts = {};
             results.forEach(symbol => {
                 symbolCounts[symbol] = (symbolCounts[symbol] || 0) + 1;
             });
 
-            // 잭팟 (3개 일치) 로직 복구!
+            // 잭팟 (3개 일치) 로직
             if (r1 === r2 && r2 === r3) {
-                // 3개 일치 시, 해당 심볼의 multiplier(배율)을 사용합니다.
+                // 일치하는 심볼 데이터를 찾습니다.
+                const matchedSymbolData = probabilities.find(p => p.symbol === r1); 
+                const multiplier = matchedSymbolData ? matchedSymbolData.payout : 0;
+                
                 winAmount = betAmount * multiplier;
                 coinBalance += winAmount;
                 
@@ -388,11 +391,10 @@ function checkResult(results) {
             // 2개 일치 (코인 반환 및 보너스 지급)
             } else if (Object.values(symbolCounts).includes(2)) { // 2개가 일치한 경우가 있다면
                 
-                // ... (이하 2개 일치 로직은 그대로 유지) ...
                 const matchedSymbol = Object.keys(symbolCounts).find(key => symbolCounts[key] === 2);
                 
-                if (matchedSymbol === '🍒' || matchedSymbol === '🍋') {
-                    // 🍒 또는 🍋 2개 일치: 배팅 금액 10 코인만 돌려줍니다.
+                // 🍒 또는 🌶 또는 🍋 2개 일치: 배팅 금액만 반환
+                if (['🍒', '🌶', '🍋'].includes(matchedSymbol)) {
                     winAmount = betAmount; 
                     coinBalance += winAmount; 
                     
