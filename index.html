@@ -2,429 +2,744 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>확률 기반 슬롯머신 (확장판)</title>
+    <title>테트리스</title>
     <style>
-        /* CSS: 실제 슬롯머신 테마 디자인 적용 및 레이아웃 수정 */
         body {
-            font-family: 'Malgun Gothic', 'Arial', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #1a1a1a;
+            font-family: 'Arial', sans-serif;
+            color: white;
+            flex-direction: column;
+            margin: 0;
+            /* [스크롤 방지] body에는 overflow hidden을 적용하지 않아야 일반적인 웹 페이지에서 작동 가능 */
+        }
+        #game-container {
+            display: flex;
+            gap: 20px;
+        }
+        #board-wrapper {
+            position: relative;
+        }
+        #tetris-board {
+            border: 5px solid #fff;
+            background-color: #000;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            display: block;
+        }
+        /* 화면 흔들림 CSS */
+        .shake {
+            animation: shake-effect 0.2s ease-in-out 2;
+        }
+        @keyframes shake-effect {
+            0% { transform: translate(3px, 3px); }
+            50% { transform: translate(-3px, -3px); }
+            100% { transform: translate(3px, 3px); }
+        }
+        /* 좌우 패널 스타일 */
+        .side-panel {
+            width: 150px;
             display: flex;
             flex-direction: column;
+            gap: 15px;
             align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            margin: 0;
-            background-color: #ffffff; /* 배경색 흰색 */
-            padding: 20px;
         }
-        
-        .top-utility { /* 좌측 상단 코인 획득 버튼과 우측 상단 확률표를 위한 컨테이너 */
+        .panel-section {
+            background-color: #333;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
             width: 100%;
-            max-width: 900px;
-            display: flex;
+            text-align: center;
+        }
+        /* [라인 표시 위치 변경] 좌측 패널 전용 스타일 */
+        #left-panel {
             justify-content: space-between;
-            align-items: flex-start;
-            position: absolute; /* 절대 위치로 상단 배치 */
-            top: 20px;
+        }
+        #lines-display {
+            padding: 15px 10px;
+            background-color: #222;
+            border: 1px solid #555;
+            border-radius: 5px;
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #00FFCC; 
+            margin-top: auto; 
         }
         
-        #earnCoinButton {
-            padding: 10px 15px;
-            font-size: 16px;
-            background-color: #4CAF50; /* 초록색 버튼 */
+        #next-piece-canvas, #hold-piece-canvas {
+            border: 1px solid #555;
+            display: block;
+            margin: 5px auto;
+        }
+        #score-display { 
+            font-size: 1.5em;
+            color: #ffcc00;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        #start-button, #restart-button {
+            padding: 15px 30px;
+            font-size: 1.5em;
+            cursor: pointer;
+            background-color: #4CAF50;
             color: white;
             border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            box-shadow: 0 4px #388E3C;
-            z-index: 10; /* 다른 요소 위에 표시되도록 설정 */
-        }
-        
-        #earnCoinButton:active {
-            box-shadow: 0 2px #388E3C;
-            transform: translateY(2px);
-        }
-        
-        #probability-table {
-            background-color: #f8f8f8;
-            border: 2px solid #ddd;
-            padding: 10px;
             border-radius: 8px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-            font-size: 14px;
-            z-index: 10; /* 다른 요소 위에 표시되도록 설정 */
-        }
-        #probability-table h2 {
-            margin-top: 0;
-            font-size: 16px;
-            border-bottom: 1px solid #ddd;
-            padding-bottom: 5px;
-            text-align: center;
-        }
-        #probability-table table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        #probability-table td {
-            padding: 3px 8px;
-            text-align: center;
-            border-bottom: 1px dotted #eee;
-        }
-        #probability-table tr:last-child td {
-            border-bottom: none;
-        }
-        
-        /* 슬롯머신 본체 디자인 */
-        .game-frame { 
-            padding: 30px;
-            background-color: #8B0000; 
-            border: 10px solid #FFD700; 
-            border-radius: 15px;
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            min-width: 400px;
-            margin-top: 100px; /* 상단 버튼과의 공간 확보 */
-        }
-        h1 {
-            color: #FFD700;
-            text-shadow: 2px 2px 4px #000;
-        }
-        .balance-box {
-            margin-bottom: 20px;
-            font-size: 20px;
-            font-weight: bold;
-            color: #000;
-            padding: 10px 20px;
-            border: 3px solid #000;
-            border-radius: 5px;
-            background-color: #7CFC00;
-            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
-            min-width: 300px;
-            text-align: center;
-        }
-        .slot-container {
-            display: flex;
-            gap: 15px;
-            margin-bottom: 30px;
-        }
-        .reel { 
-            font-size: 60px; 
-            width: 100px;
-            height: 100px;
-            line-height: 100px;
-            text-align: center;
-            border: 6px solid #C0C0C0; 
-            border-radius: 10px;
-            background-color: #333; 
-            color: #fff; 
-            box-shadow: inset 0 0 10px rgba(0,0,0,0.8), 0 5px 10px rgba(0,0,0,0.5);
-            overflow: hidden;
-        }
-        button#spinButton { 
-            padding: 15px 50px;
-            font-size: 28px;
-            cursor: pointer;
-            background-color: #FF0000; 
-            color: white;
-            border: 5px solid #FFD700; 
-            border-radius: 50px;
             transition: background-color 0.3s;
-            font-weight: bold;
-            text-shadow: 1px 1px 2px #000;
+            margin-top: 20px;
+            display: none;
         }
-        button#spinButton:hover:not(:disabled) {
-            background-color: #cc0000;
-            box-shadow: 0 0 20px #FFD700;
+        #restart-button {
+            background-color: #FF5733;
         }
-        button#spinButton:disabled {
-            background-color: #ffcdd2;
-            cursor: not-allowed;
-            border: 5px solid #aaa;
+        #start-button:hover, #restart-button:hover {
+            background-color: #45a049;
         }
-        #result {
-            margin-top: 30px;
-            font-size: 32px;
-            font-weight: 900;
-            min-height: 30px;
-            color: #FFD700; 
-            text-shadow: 1px 1px 2px #000;
+        #info {
+            margin-top: 20px;
+            font-size: 0.9em;
+            text-align: center;
+            line-height: 1.4;
+            color: #bbb;
         }
     </style>
 </head>
 <body>
-    
-    <div class="top-utility">
-        <button id="earnCoinButton">🪙 코인 획득 (+10)</button>
+    <div id="score-display">점수: 0</div>
+
+    <div id="game-container">
+        <div id="left-panel" class="side-panel">
+            <div class="panel-section">
+                <strong>HOLD</strong>
+                <canvas id="hold-piece-canvas" width="120" height="120"></canvas>
+            </div>
+             <div id="lines-display" class="panel-section">
+                LINES: 0
+            </div>
+        </div>
+
+        <div id="board-wrapper">
+            <canvas id="tetris-board" width="300" height="600"></canvas>
+        </div>
         
-        <div id="probability-table">
-            <h2>심볼 및 배율</h2>
-            <table>
-                <thead>
-                    <tr><td>심볼</td><td>확률(%)</td><td>배율(X)</td></tr>
-                </thead>
-                <tbody id="payoutTableBody">
-                </tbody>
-            </table>
+        <div id="right-panel" class="side-panel">
+            <div class="panel-section">
+                <strong>NEXT</strong>
+                <canvas id="next-piece-canvas" width="120" height="120"></canvas>
+            </div>
         </div>
     </div>
     
-    <div class="game-frame"> 
-        <h1>슬롯머신</h1>
-        
-        <div class="balance-box">
-            잔액: <span id="coinBalanceDisplay">100</span> 코인 (배팅: 10 코인)
-        </div>
+    <button id="start-button">START GAME</button>
+    <button id="restart-button" style="display: none;">RESTART GAME</button>
 
-        <div class="slot-container">
-            <div class="reel" id="reel1">❓</div>
-            <div class="reel" id="reel2">❓</div>
-            <div class="reel" id="reel3">❓</div>
-        </div>
-
-        <button id="spinButton">SPIN</button>
-
-        <div id="result">SPIN 버튼을 누르세요!</div>
-    </div> 
-
+    <div id="info">
+        조작 키: **A** ($\leftarrow$), **D** ($\rightarrow$), **S** ($\downarrow$) (이동/하강), **Space** (하드 드롭)<br>
+        **W/R/Z/X** ($\uparrow$) (회전), **Shift/C** (홀드)<br>
+        (화면을 클릭하고 키보드를 눌러주세요.)
+    </div>
+    
     <script>
-        // JavaScript: 슬롯머신 로직 (버그 수정 및 안정화 버전)
+        // ===================================
+        // 1. 게임 설정 및 데이터 구조
+        // ===================================
+
+        const COLS = 10;
+        const ROWS = 20;
+        const LOCK_DELAY = 500;
+        const LINE_CLEAR_DURATION = 200; 
+
+        const KEY_INITIAL_DELAY = 150;
+        const KEY_REPEAT_RATE = 50;  
         
-        // --- 1. 설정 및 변수 ---
-        const probabilities = [
-            { symbol: '🍒', weight: 35, payout: 2 }, 
-            { symbol: '🌶', weight: 25, payout: 3 }, // ⚠️ 원본 코드의 문법 오류 수정: 쉼표 추가
-            { symbol: '🍋', weight: 20, payout: 5 },
-            { symbol: '🔔', weight: 10, payout: 20 },
-            { symbol: '⭐', weight: 7, payout: 100 }, 
-            { symbol: '7️⃣', weight: 3, payout: 10000 }  
+        const canvas = document.getElementById('tetris-board');
+        const boardWrapper = document.getElementById('board-wrapper');
+        const ctx = canvas.getContext('2d');
+        const BLOCK_SIZE = canvas.width / COLS;
+
+        const nextCanvas = document.getElementById('next-piece-canvas');
+        const nextCtx = nextCanvas.getContext('2d');
+        const holdCanvas = document.getElementById('hold-piece-canvas'); 
+        const holdCtx = holdCanvas.getContext('2d');
+        const SIDE_BLOCK_SIZE = nextCanvas.width / 4;
+
+        const TETROMINOES = [
+            { shape: [[0, 0, 0, 0], [1, 1, 1, 1], [0, 0, 0, 0], [0, 0, 0, 0]], color: '#00FFFF' }, // I
+            { shape: [[1, 0, 0], [1, 1, 1], [0, 0, 0]], color: '#0000FF' }, // J
+            { shape: [[0, 0, 1], [1, 1, 1], [0, 0, 0]], color: '#FFA500' }, // L
+            { shape: [[1, 1], [1, 1]], color: '#FFFF00' }, // O
+            { shape: [[0, 1, 1], [1, 1, 0], [0, 0, 0]], color: '#00FF00' }, // S
+            { shape: [[0, 1, 0], [1, 1, 1], [0, 0, 0]], color: '#800080' }, // T
+            { shape: [[1, 1, 0], [0, 1, 1], [0, 0, 0]], color: '#FF0000' } // Z
         ];
+
+        let board = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+        let currentPiece = null;
+        let nextPiece = null;
+        let heldPiece = null;
+        let holdUsed = false;
+        let currentX = 0;
+        let currentY = 0;
+        let gameRunning = false; 
+        let score = 0;
+        let lines = 0; 
+        let combo = 0; 
+        let dropInterval = 1000;
+        let lastDropTime = 0;
+        let lockTimeout = null;
+        let isLocked = false;
+        let linesToClear = [];
+        let clearStartTime = 0;
+        let animationFrameId;
+
+        const keysPressed = {}; 
+        let keyRepeatTimer = null; 
+
+        // ===================================
+        // 2. 시각화 및 드로잉 함수
+        // ===================================
+
+        function drawBlock(ctx, x, y, color, size, drawBorder = true, alpha = 1.0) {
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = color;
+            ctx.fillRect(x * size, y * size, size, size);
+            
+            if (drawBorder) {
+                ctx.strokeStyle = '#222';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(x * size, y * size, size, size);
+            }
+            ctx.globalAlpha = 1.0; 
+        }
         
-        const partialMatchPayout = 3; 
-        const INITIAL_BALANCE = 100; 
-        const EARN_AMOUNT = 10; // 코인 획득 버튼으로 얻을 금액
-        
-        let coinBalance; 
-        const betAmount = 10;
-        const REEL_STOP_INTERVAL = 500; 
-        const SPIN_DURATION = 1500; 
-        const STORAGE_KEY = 'slotMachineCoinBalance'; 
+        function drawGrid() {
+            ctx.strokeStyle = '#888';
+            ctx.lineWidth = 0.5;
 
-        const reelElements = [
-            document.getElementById('reel1'),
-            document.getElementById('reel2'),
-            document.getElementById('reel3')
-        ];
-        const spinButton = document.getElementById('spinButton');
-        const earnCoinButton = document.getElementById('earnCoinButton');
-        const resultDisplay = document.getElementById('result');
-        const balanceDisplay = document.getElementById('coinBalanceDisplay');
-        const payoutTableBody = document.getElementById('payoutTableBody');
+            for (let x = 1; x < COLS; x++) {
+                ctx.beginPath();
+                ctx.moveTo(x * BLOCK_SIZE, 0);
+                ctx.lineTo(x * BLOCK_SIZE, canvas.height);
+                ctx.stroke();
+            }
 
-        // --- 2. 로컬 저장소 및 잔액 관리 ---
-
-        function saveBalance() {
-            // 저장 시 값이 숫자인지 확인하는 안전장치 추가
-            if (!isNaN(coinBalance)) {
-                localStorage.setItem(STORAGE_KEY, coinBalance.toString());
+            for (let y = 1; y < ROWS; y++) {
+                ctx.beginPath();
+                ctx.moveTo(0, y * BLOCK_SIZE);
+                ctx.lineTo(canvas.width, y * BLOCK_SIZE);
+                ctx.stroke();
             }
         }
 
-        function loadBalance() {
-            const savedBalance = localStorage.getItem(STORAGE_KEY);
-            // 저장된 값이 유효하지 않거나 0보다 작으면 초기값으로 설정
-            if (savedBalance === null || isNaN(parseInt(savedBalance)) || parseInt(savedBalance) < 0) {
-                coinBalance = INITIAL_BALANCE;
-            } else {
-                coinBalance = parseInt(savedBalance);
-            }
-            updateBalanceDisplay();
-        }
+        function drawSidePiece(ctx, piece) {
+            ctx.fillStyle = '#111';
+            ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
-        function updateBalanceDisplay() {
-            balanceDisplay.textContent = coinBalance;
-            saveBalance(); 
+            if (!piece) return;
 
-            if (coinBalance < betAmount) {
-                spinButton.disabled = true;
-                resultDisplay.textContent = "코인 부족! 코인 획득 버튼을 누르세요.";
-                resultDisplay.style.color = 'red';
-            } else {
-                spinButton.disabled = false;
-            }
-        }
-
-        // --- 3. 유틸리티 기능 ---
-
-        // 확률 테이블 채우기
-        function populatePayoutTable() {
-            payoutTableBody.innerHTML = ''; // 기존 내용 초기화
-            probabilities.forEach(item => {
-                const row = payoutTableBody.insertRow();
-                row.insertCell().textContent = item.symbol;
-                row.insertCell().textContent = `${(item.weight / 100 * 3).toFixed(2)}%`; // 3번의 기회이므로 3으로 나누어주는 것이 일반적이나, 여기서는 심볼 1개 확률 그대로 표시
-                row.insertCell().textContent = `${item.payout}X`;
-            });
-            // 두 개 일치 보너스 행 추가
-            const bonusRow = payoutTableBody.insertRow();
-            bonusRow.insertCell().textContent = '2개 일치';
-            bonusRow.insertCell().textContent = '-';
-            bonusRow.insertCell().textContent = `🍒/🌶/🍋: ${betAmount} 반환, 나머지: ${partialMatchPayout}X`;
-            bonusRow.style.fontWeight = 'bold';
-            bonusRow.cells[2].style.textAlign = 'left'; // 텍스트가 길어서 왼쪽 정렬
-        }
-
-        // 코인 획득 기능
-        function earnCoin() {
-            coinBalance += EARN_AMOUNT;
-            updateBalanceDisplay();
-            resultDisplay.textContent = `🪙 ${EARN_AMOUNT} 코인 획득! 잔액: ${coinBalance}`;
-            resultDisplay.style.color = '#4CAF50'; 
-        }
-
-        // --- 4. 확률 기반 심볼 선택 로직 ---
-        
-        function getSymbolByProbability() {
-            const totalWeight = probabilities.reduce((sum, item) => sum + item.weight, 0);
-            let random = Math.random() * totalWeight;
-
-            for (const item of probabilities) {
-                if (random < item.weight) {
-                    return item.symbol;
+            const shape = piece.shape;
+            const shapeWidth = shape[0].length;
+            const shapeHeight = shape.length;
+            const startX = Math.floor((4 - shapeWidth) / 2);
+            const startY = Math.floor((4 - shapeHeight) / 2);
+            
+            for (let y = 0; y < shapeHeight; y++) {
+                for (let x = 0; x < shapeWidth; x++) {
+                    if (shape[y][x] === 1) {
+                        drawBlock(ctx, startX + x, startY + y, piece.color, SIDE_BLOCK_SIZE);
+                    }
                 }
-                random -= item.weight;
             }
-            // 안전장치
-            return probabilities[probabilities.length - 1].symbol; 
         }
-        
-        // --- 5. 릴 회전 모션 로직 ---
-        
-        function startSpinMotion(reelElement, spinDuration) {
-            const allSymbols = probabilities.map(p => p.symbol);
-            let startTime = null;
 
-            function animate(timestamp) {
-                if (!startTime) startTime = timestamp;
-                const elapsed = timestamp - startTime;
+        function getDropY() {
+            let dropY = currentY;
+            while (isValidMove(currentX, dropY + 1, currentPiece.shape)) {
+                dropY++;
+            }
+            return dropY;
+        }
+
+        function draw() {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            drawGrid();
+
+            const isClearing = linesToClear.length > 0;
+            const elapsed = Date.now() - clearStartTime;
+            const drawBlocks = isClearing ? elapsed > LINE_CLEAR_DURATION : true; 
+
+            // 1. 고정된 블록 그리기
+            for (let y = 0; y < ROWS; y++) {
+                if (isClearing && linesToClear.includes(y)) {
+                    continue;
+                }
                 
-                if (elapsed < spinDuration) {
-                    const randomIndex = Math.floor(Math.random() * allSymbols.length);
-                    reelElement.textContent = allSymbols[randomIndex];
-                    requestAnimationFrame(animate);
+                if (drawBlocks) {
+                    for (let x = 0; x < COLS; x++) {
+                        const cellValue = board[y][x];
+                        if (cellValue !== 0) {
+                            drawBlock(ctx, x, y, cellValue, BLOCK_SIZE); 
+                        }
+                    }
                 }
             }
-            requestAnimationFrame(animate);
+
+            if (currentPiece && drawBlocks) {
+                // 2. 고스트 피스 그리기
+                const dropY = getDropY();
+                if (dropY !== currentY) {
+                    for (let y = 0; y < currentPiece.shape.length; y++) {
+                        for (let x = 0; x < currentPiece.shape[y].length; x++) {
+                            if (currentPiece.shape[y][x] === 1) {
+                                drawBlock(ctx, currentX + x, dropY + y, currentPiece.color, BLOCK_SIZE, true, 0.3);
+                            }
+                        }
+                    }
+                }
+
+                // 3. 현재 움직이는 블록 그리기
+                for (let y = 0; y < currentPiece.shape.length; y++) {
+                    for (let x = 0; x < currentPiece.shape[y].length; x++) {
+                        if (currentPiece.shape[y][x] === 1) {
+                            drawBlock(ctx, currentX + x, currentY + y, currentPiece.color, BLOCK_SIZE);
+                        }
+                    }
+                }
+            }
+            
+            // 콤보 표시
+            if (gameRunning && combo > 1) {
+                ctx.fillStyle = '#FFD700';
+                ctx.font = 'bold 30px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(`COMBO x ${combo}`, canvas.width / 2, canvas.height / 3);
+            }
+
+            // 사이드 패널 업데이트
+            drawSidePiece(nextCtx, nextPiece);
+            drawSidePiece(holdCtx, heldPiece);
+
+            // 점수 및 라인 업데이트
+            document.getElementById('score-display').textContent = 
+                `점수: ${score} ${!gameRunning && (score > 0 || lines > 0) ? ' | GAME OVER!' : ''}`;
+            document.getElementById('lines-display').textContent = `LINES: ${lines}`;
+            
+            document.getElementById('restart-button').style.display = !gameRunning && (score > 0 || lines > 0) ? 'block' : 'none';
         }
 
-        // --- 6. 게임 로직 ---
+        // ===================================
+        // 3. 핵심 게임 로직 함수
+        // ===================================
 
-        function spinReelAndGetResult(reelElement, finalSymbol, spinDuration) {
-            return new Promise(resolve => {
-                startSpinMotion(reelElement, spinDuration);
+        function getRandomTetromino() {
+            const index = Math.floor(Math.random() * TETROMINOES.length);
+            return JSON.parse(JSON.stringify(TETROMINOES[index]));
+        }
+
+        function generatePiece() {
+            clearTimeout(lockTimeout);
+            isLocked = false; 
+            holdUsed = false;
+
+            if (nextPiece === null) {
+                nextPiece = getRandomTetromino();
+            }
+            currentPiece = nextPiece;
+            nextPiece = getRandomTetromino();
+
+            const shapeWidth = currentPiece.shape[0].length;
+            currentX = Math.floor(COLS / 2) - Math.floor(shapeWidth / 2);
+            currentY = 0; 
+            
+            if (!isValidMove(currentX, currentY, currentPiece.shape)) {
+                gameRunning = false;
+                cancelAnimationFrame(animationFrameId);
+                draw();
+                return false;
+            }
+            return true;
+        }
+
+        function isValidMove(newX, newY, pieceShape) {
+            for (let y = 0; y < pieceShape.length; y++) {
+                for (let x = 0; x < pieceShape[y].length; x++) {
+                    if (pieceShape[y][x] === 1) {
+                        const boardX = newX + x;
+                        const boardY = newY + y;
+                        
+                        if (boardX < 0 || boardX >= COLS || boardY >= ROWS) return false;
+                        if (boardY >= 0 && board[boardY][boardX] !== 0) return false;
+                    }
+                }
+            }
+            return true;
+        }
+        
+        /**
+         * 벽차기(Wall Kick) 회전 로직.
+         */
+        function rotatePiece() {
+            if (!currentPiece) return false;
+
+            const oldShape = currentPiece.shape;
+            const N = oldShape.length;
+            const newShape = Array.from({ length: N }, () => Array(N).fill(0));
+
+            // 1. 회전 계산
+            for (let y = 0; y < N; y++) {
+                for (let x = 0; x < N; x++) {
+                    newShape[x][N - 1 - y] = oldShape[y][x];
+                }
+            }
+            
+            // 2. 일반 회전 시도
+            if (isValidMove(currentX, currentY, newShape)) {
+                currentPiece.shape = newShape;
+                if (isLocked) resetLockDelay(); 
+                return true;
+            }
+
+            // 3. 벽차기(Wall Kick) 시도 (좌우 1~2칸 이동)
+            const kickAttempts = [1, -1, 2, -2]; 
+
+            for (let kickX of kickAttempts) {
+                if (isValidMove(currentX + kickX, currentY, newShape)) {
+                    currentX += kickX;
+                    currentPiece.shape = newShape;
+                    if (isLocked) resetLockDelay(); 
+                    return true;
+                }
+            }
+            
+            return false;
+        }
+
+
+        function startLockDelay() {
+            clearTimeout(lockTimeout);
+            isLocked = true;
+            lockTimeout = setTimeout(() => {
+                if (!isValidMove(currentX, currentY + 1, currentPiece.shape)) {
+                    lockPiece();
+                } else {
+                    isLocked = false;
+                }
+            }, LOCK_DELAY);
+        }
+        
+        function resetLockDelay() {
+            if (isLocked) {
+                clearTimeout(lockTimeout);
+                startLockDelay();
+            }
+        }
+
+        function lockPiece() {
+            for (let y = 0; y < currentPiece.shape.length; y++) {
+                for (let x = 0; x < currentPiece.shape[y].length; x++) {
+                    if (currentPiece.shape[y][x] === 1) {
+                        if (currentY + y >= 0 && currentY + y < ROWS) {
+                            board[currentY + y][currentX + x] = currentPiece.color; 
+                        }
+                    }
+                }
+            }
+            
+            const clearedLines = checkClearLines();
+
+            if (clearedLines > 0) {
+                combo++;
+                if (combo > 1) {
+                    score += combo * 50; 
+                }
+            } else {
+                combo = 0;
+            }
+            
+            score += 10;
+            
+            if (linesToClear.length === 0) { 
+                generatePiece();
+            }
+        }
+
+        function drop() {
+            if (!currentPiece) return;
+            if (linesToClear.length > 0) return; 
+
+            const canMoveDown = isValidMove(currentX, currentY + 1, currentPiece.shape);
+
+            if (canMoveDown) {
+                currentY++;
+                clearTimeout(lockTimeout);
+                isLocked = false;
+            } else {
+                if (!isLocked) {
+                    startLockDelay();
+                }
+            }
+        }
+
+        function holdPiece() {
+            if (!currentPiece || holdUsed || linesToClear.length > 0) return;
+            
+            holdUsed = true; 
+            const pieceToHold = JSON.parse(JSON.stringify(currentPiece));
+            
+            if (heldPiece === null) {
+                heldPiece = pieceToHold;
+                generatePiece();
+            } else {
+                currentPiece = heldPiece;
+                heldPiece = pieceToHold;
+                
+                const shapeWidth = currentPiece.shape[0].length;
+                currentX = Math.floor(COLS / 2) - Math.floor(shapeWidth / 2);
+                currentY = 0; 
+                
+                if (!isValidMove(currentX, currentY, currentPiece.shape)) {
+                    gameRunning = false;
+                    cancelAnimationFrame(animationFrameId);
+                    draw();
+                }
+            }
+            
+            clearTimeout(lockTimeout);
+            isLocked = false; 
+            draw();
+        }
+
+        function checkClearLines() {
+            let clearedCount = 0;
+            linesToClear = [];
+
+            for (let y = ROWS - 1; y >= 0; y--) {
+                if (board[y].every(cell => cell !== 0)) {
+                    clearedCount++;
+                    linesToClear.push(y);
+                }
+            }
+
+            if (clearedCount > 0) {
+                boardWrapper.classList.add('shake');
+                clearStartTime = Date.now();
+
+                draw(); 
                 
                 setTimeout(() => {
-                    reelElement.textContent = finalSymbol;
-                    resolve(finalSymbol);
-                }, spinDuration);
-            });
-        }
+                    boardWrapper.classList.remove('shake');
+                    
+                    for (let y = ROWS - 1; y >= 0; y--) {
+                        if (board[y].every(cell => cell !== 0)) {
+                            for (let k = y; k > 0; k--) {
+                                board[k] = board[k - 1];
+                            }
+                            board[0] = Array(COLS).fill(0);
+                            y++; 
+                        }
+                    }
+                    
+                    lines += clearedCount; 
+                    if (clearedCount === 1) score += 100;
+                    else if (clearedCount === 2) score += 300;
+                    else if (clearedCount === 3) score += 500;
+                    else if (clearedCount === 4) score += 800;
 
-        async function spinSlots() {
-            if (spinButton.disabled) return;
-
-            coinBalance -= betAmount;
-            updateBalanceDisplay();
-            spinButton.disabled = true;
-            resultDisplay.textContent = "릴이 돌아갑니다... 행운을 빌어요!";
-            resultDisplay.style.color = '#333';
-            
-            const finalSymbols = reelElements.map(() => getSymbolByProbability()); 
-            const spinPromises = [];
-            
-            for (let i = 0; i < reelElements.length; i++) {
-                const duration = SPIN_DURATION + (i * REEL_STOP_INTERVAL);
-                
-                spinPromises.push(
-                    spinReelAndGetResult(reelElements[i], finalSymbols[i], duration)
-                );
+                    linesToClear = [];
+                    generatePiece();
+                }, LINE_CLEAR_DURATION);
             }
             
-            const results = await Promise.all(spinPromises);
-
-            checkResult(results);
-            // 릴 회전이 끝난 후 버튼 활성화
-            spinButton.disabled = false;
-            updateBalanceDisplay();
+            return clearedCount;
         }
 
-        function checkResult(results) {
-            if (results.length !== 3) {
-                resultDisplay.textContent = "치명적인 오류 발생: 결과 개수 불일치.";
-                resultDisplay.style.color = 'red';
+        // ===================================
+        // 4. 게임 루프 및 입력/재시작
+        // ===================================
+        
+        function handleInput() {
+            if (!gameRunning || !currentPiece || linesToClear.length > 0) return;
+            
+            let moved = false;
+            
+            // 회전 처리 (W, R, ArrowUp, Z, X)
+            if (keysPressed['w'] || keysPressed['r'] || keysPressed['arrowup'] || keysPressed['z'] || keysPressed['x']) {
+                if (rotatePiece()) {
+                    moved = true; 
+                }
+                // 회전 키는 한번만 실행
+                keysPressed['w'] = keysPressed['r'] = keysPressed['arrowup'] = keysPressed['z'] = keysPressed['x'] = false; 
+            }
+            
+            // 홀드 처리 (Shift, C)
+            if (keysPressed['shift'] || keysPressed['c']) {
+                holdPiece();
+                keysPressed['shift'] = keysPressed['c'] = false;
                 return;
             }
-
-            const [r1, r2, r3] = results;
-            let message = "";
-            let winAmount = 0;
-
-            // 릴 심볼이 나오는 횟수를 계산합니다.
-            const symbolCounts = {};
-            results.forEach(symbol => {
-                symbolCounts[symbol] = (symbolCounts[symbol] || 0) + 1;
-            });
-
-            // 잭팟 (3개 일치) 로직
-            if (r1 === r2 && r2 === r3) {
-                // 일치하는 심볼 데이터를 찾습니다.
-                const matchedSymbolData = probabilities.find(p => p.symbol === r1); 
-                const multiplier = matchedSymbolData ? matchedSymbolData.payout : 0;
-                
-                winAmount = betAmount * multiplier;
-                coinBalance += winAmount;
-                
-                message = `🎉 💥💥 JACKPOT! 💥💥 ${r1} 3개 일치! ${multiplier}배 획득! (+${winAmount})`;
-                resultDisplay.style.color = '#ff9800'; 
             
-            // 2개 일치 (코인 반환 및 보너스 지급)
-            } else if (Object.values(symbolCounts).includes(2)) { // 2개가 일치한 경우가 있다면
-                
-                const matchedSymbol = Object.keys(symbolCounts).find(key => symbolCounts[key] === 2);
-                
-                // 🍒 또는 🌶 또는 🍋 2개 일치: 배팅 금액만 반환
-                if (['🍒', '🌶', '🍋'].includes(matchedSymbol)) {
-                    winAmount = betAmount; 
-                    coinBalance += winAmount; 
-                    
-                    message = `🥳 ${matchedSymbol} 2개 일치! 배팅 금액 (${betAmount} 코인) 반환!`;
-                    resultDisplay.style.color = '#4CAF50'; 
-                
-                } else {
-                    // 나머지 심볼 (🔔, ⭐, 7️⃣) 2개 일치: 기존 보너스 배율 적용
-                    winAmount = betAmount * partialMatchPayout;
-                    coinBalance += winAmount;
-
-                    message = `🥳 ${matchedSymbol} 2개 일치! 보너스 ${partialMatchPayout}배 획득! (+${winAmount})`;
-                    resultDisplay.style.color = '#4CAF50'; 
+            // 하드 드롭 처리 (Space)
+            if (keysPressed[' ']) {
+                while (isValidMove(currentX, currentY + 1, currentPiece.shape)) {
+                    currentY++;
                 }
-
-            } else {
-                // 일치 없음
-                message = `꽝!. 다시 도전! (-${betAmount})`;
-                resultDisplay.style.color = '#d32f2f'; 
+                lockPiece();
+                keysPressed[' '] = false;
+                return;
             }
             
-            resultDisplay.textContent = message;
+            // 수평 이동 처리 (A, D, ArrowLeft, ArrowRight)
+            let newX = currentX;
+            if (keysPressed['a'] || keysPressed['arrowleft']) {
+                newX = currentX - 1;
+            } else if (keysPressed['d'] || keysPressed['arrowright']) {
+                newX = currentX + 1;
+            }
+
+            // 소프트 드롭 처리 (S, ArrowDown)
+            let newY = currentY;
+            if (keysPressed['s'] || keysPressed['arrowdown']) {
+                newY = currentY + 1;
+            }
+            
+            const isValidHMove = isValidMove(newX, currentY, currentPiece.shape);
+            const isValidVMove = isValidMove(currentX, newY, currentPiece.shape);
+
+            let actualMovement = false;
+
+            if (isValidHMove && newX !== currentX) {
+                currentX = newX;
+                actualMovement = true;
+            } 
+            if (isValidVMove && newY !== currentY) {
+                currentY = newY;
+                actualMovement = true;
+            } else if ((keysPressed['s'] || keysPressed['arrowdown']) && !isValidVMove) {
+                if (!isLocked) startLockDelay();
+            }
+
+            if (actualMovement || moved) {
+                if (isLocked) resetLockDelay();
+                draw();
+            }
         }
         
-        // --- 7. 초기 실행 ---
-        populatePayoutTable(); // 확률표 채우기
-        loadBalance(); 
-        spinButton.addEventListener('click', spinSlots);
-        earnCoinButton.addEventListener('click', earnCoin);
+        function startKeyRepeat() {
+            if (keyRepeatTimer) return;
+            
+            keyRepeatTimer = setTimeout(() => {
+                keyRepeatTimer = setInterval(handleInput, KEY_REPEAT_RATE);
+            }, KEY_INITIAL_DELAY);
+        }
+        function stopKeyRepeat() {
+            clearTimeout(keyRepeatTimer);
+            clearInterval(keyRepeatTimer);
+            keyRepeatTimer = null;
+        }
+
+        function gameLoop(timestamp) {
+            if (!gameRunning) return;
+
+            if (linesToClear.length === 0 && timestamp - lastDropTime > dropInterval) {
+                drop();
+                lastDropTime = timestamp;
+            }
+
+            draw();
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        function startGame() {
+            document.getElementById('start-button').style.display = 'none';
+            document.getElementById('restart-button').style.display = 'none';
+
+            board = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+            score = 0;
+            lines = 0; 
+            combo = 0;
+            gameRunning = true;
+            lastDropTime = 0;
+            currentPiece = null;
+            nextPiece = null;
+            heldPiece = null;
+            holdUsed = false;
+            linesToClear = [];
+            clearTimeout(lockTimeout);
+            isLocked = false;
+            
+            generatePiece(); 
+            cancelAnimationFrame(animationFrameId); 
+            animationFrameId = requestAnimationFrame(gameLoop);
+            
+            stopKeyRepeat(); 
+            for(let key in keysPressed) delete keysPressed[key];
+
+            draw();
+        }
+
+        // -----------------------------------
+        // 이벤트 리스너 및 초기 설정
+        // -----------------------------------
+
+        document.addEventListener('keydown', (e) => {
+            const key = e.key.toLowerCase();
+            
+            // **[스크롤 방지]** 게임 조작에 사용되는 모든 키에 대해 기본 동작 방지
+            const preventKeys = [
+                'arrowup', 'arrowdown', 'arrowleft', 'arrowright', 
+                ' ', 'shift', 'c', 'z', 'x', 'w', 'r', 'a', 'd', 's'
+            ];
+            
+            if (preventKeys.includes(key) || (e.key === ' ' || e.key === 'Shift')) {
+                e.preventDefault(); 
+            }
+
+            if (!gameRunning) return;
+
+            if (!keysPressed[key]) {
+                keysPressed[key] = true;
+                
+                // 회전/하드드롭/홀드 키는 즉시 처리
+                if (['w', 'r', 'arrowup', 'z', 'x', ' ', 'shift', 'c'].includes(key)) {
+                    handleInput(); 
+                } else {
+                    handleInput();
+                    startKeyRepeat();
+                }
+            }
+        });
         
+        document.addEventListener('keyup', (e) => {
+            const key = e.key.toLowerCase();
+            delete keysPressed[key];
+            
+            // 반복 속성 키가 모두 해제되었는지 확인
+            if (['a', 'd', 'arrowleft', 'arrowright', 's', 'arrowdown'].includes(key)) {
+                let repeatingKeyStillPressed = false;
+                for(let k in keysPressed) {
+                    if (['a', 'd', 'arrowleft', 'arrowright', 's', 'arrowdown'].includes(k)) {
+                        repeatingKeyStillPressed = true;
+                        break;
+                    }
+                }
+                if (!repeatingKeyStillPressed) {
+                    stopKeyRepeat();
+                }
+            }
+        });
+        
+        document.getElementById('start-button').addEventListener('click', startGame);
+        document.getElementById('restart-button').addEventListener('click', startGame);
+
+        // 초기 화면 설정
+        drawSidePiece(nextCtx, getRandomTetromino()); 
+        document.getElementById('start-button').style.display = 'block'; 
+        draw(); 
     </script>
-    </body>
+</body>
 </html>
